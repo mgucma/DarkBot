@@ -67,6 +67,7 @@ public class PluginHandler implements API.Singleton {
     private static final List<PluginListener> LISTENERS = new ArrayList<>();
 
     private final EventBrokerAPI eventBroker;
+    private volatile boolean signatureChecksDisabled;
 
     public void addListener(PluginListener listener) {
         if (!LISTENERS.contains(listener)) LISTENERS.add(listener);
@@ -268,13 +269,34 @@ public class PluginHandler implements API.Singleton {
     }
 
     private void testSignature(Plugin plugin, JarFile jar) throws IOException {
+        if (signatureChecksDisabled) return;
         try {
             Boolean signatureValid = AuthAPI.getInstance().checkPluginJarSignature(jar);
             if (signatureValid == null) plugin.getIssues().add(PLUGIN_NOT_SIGNED);
             else if (!signatureValid) plugin.getIssues().add(UNKNOWN_SIGNATURE);
-        } catch (SecurityException e) {
-            plugin.getIssues().add(INVALID_SIGNATURE);
+        } catch (Throwable e) {
+            if (isUnsignedBotError(e)) {
+                signatureChecksDisabled = true;
+                return;
+            }
+            if (e instanceof SecurityException) {
+                plugin.getIssues().add(INVALID_SIGNATURE);
+                return;
+            }
+            if (e instanceof IOException) throw (IOException) e;
+            throw new RuntimeException("Failed to check plugin signature", e);
         }
+    }
+
+    private boolean isUnsignedBotError(Throwable e) {
+        return hasMessage(e, "Unsigned bot");
+    }
+
+    private boolean hasMessage(Throwable throwable, String message) {
+        if (throwable == null) return false;
+        String current = throwable.getMessage();
+        if (current != null && current.contains(message)) return true;
+        return hasMessage(throwable.getCause(), message);
     }
 
     private boolean isFeature(String path) {
