@@ -273,8 +273,22 @@ public class PluginHandler implements API.Singleton {
             if (signatureValid == null) plugin.getIssues().add(PLUGIN_NOT_SIGNED);
             else if (!signatureValid) plugin.getIssues().add(UNKNOWN_SIGNATURE);
         } catch (SecurityException e) {
+            if (isUnsignedBotError(e)) {
+                return;
+            }
             plugin.getIssues().add(INVALID_SIGNATURE);
         }
+    }
+
+    private boolean isUnsignedBotError(SecurityException e) {
+        return hasMessage(e, "Unsigned bot");
+    }
+
+    private boolean hasMessage(Throwable throwable, String message) {
+        if (throwable == null) return false;
+        String current = throwable.getMessage();
+        if (current != null && current.contains(message)) return true;
+        return hasMessage(throwable.getCause(), message);
     }
 
     private boolean isFeature(String path) {
