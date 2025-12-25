@@ -272,20 +272,7 @@ public class PluginHandler implements API.Singleton {
             Boolean signatureValid = AuthAPI.getInstance().checkPluginJarSignature(jar);
             if (signatureValid == null) plugin.getIssues().add(PLUGIN_NOT_SIGNED);
             else if (!signatureValid) plugin.getIssues().add(UNKNOWN_SIGNATURE);
-        } catch (Throwable e) {
-            if (isUnsignedBotError(e)) {
-                return;
-            }
-            if (e instanceof SecurityException) {
-                plugin.getIssues().add(INVALID_SIGNATURE);
-                return;
-            }
-            if (e instanceof IOException) throw (IOException) e;
-            throw new RuntimeException("Failed to check plugin signature", e);
-        }
-    }
 
-    private boolean isUnsignedBotError(Throwable e) {
         return hasMessage(e, "Unsigned bot");
     }
 
