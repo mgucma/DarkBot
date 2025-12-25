@@ -270,28 +270,33 @@ public class PluginHandler implements API.Singleton {
     }
 
     private void testSignature(Plugin plugin, JarFile jar) throws IOException {
-        if (signatureChecksDisabled || AuthAPI.isUnsignedBot()) {
-            signatureChecksDisabled = true;
-            return;
-        }
+        if (signatureChecksDisabled) return;
         try {
             AuthAPI authAPI = getAuthAPI();
             if (authAPI == null) return;
             Boolean signatureValid = authAPI.checkPluginJarSignature(jar);
             if (signatureValid == null) plugin.getIssues().add(PLUGIN_NOT_SIGNED);
             else if (!signatureValid) plugin.getIssues().add(UNKNOWN_SIGNATURE);
-        } catch (Throwable e) {
-            if (isUnsignedBotError(e)) {
-                signatureChecksDisabled = true;
-                return;
-            }
-            if (e instanceof SecurityException) {
-                plugin.getIssues().add(INVALID_SIGNATURE);
-                return;
-            }
-            if (e instanceof IOException) throw (IOException) e;
-            throw new RuntimeException("Failed to check plugin signature", e);
-        }
+
+        return hasMessage(e, "Unsigned bot");
+    }
+
+    private boolean hasMessage(Throwable throwable, String message) {
+        if (throwable == null) return false;
+        String current = throwable.getMessage();
+        if (current != null && current.contains(message)) return true;
+        return hasMessage(throwable.getCause(), message);
+    }
+
+    private boolean isUnsignedBotError(Throwable e) {
+        return hasMessage(e, "Unsigned bot");
+    }
+
+    private boolean hasMessage(Throwable throwable, String message) {
+        if (throwable == null) return false;
+        String current = throwable.getMessage();
+        if (current != null && current.contains(message)) return true;
+        return hasMessage(throwable.getCause(), message);
     }
 
     private AuthAPI getAuthAPI() {
@@ -309,7 +314,7 @@ public class PluginHandler implements API.Singleton {
     }
 
     private boolean isUnsignedBotError(Throwable e) {
-        return hasMessage(e, UNSIGNED_BOT_MESSAGE);
+        return hasMessage(e, "Unsigned bot");
     }
 
     private boolean hasMessage(Throwable throwable, String message) {
