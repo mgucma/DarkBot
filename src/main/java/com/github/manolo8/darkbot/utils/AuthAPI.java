@@ -5,15 +5,25 @@ import org.jetbrains.annotations.Nullable;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.jar.JarFile;
 
 public interface AuthAPI extends eu.darkbot.api.managers.AuthAPI {
 
     Path VERIFIER_PATH = Paths.get("lib", "verifier.jar");
     AuthAPI INSTANCE = ReflectionUtils.createInstance("eu.darkbot.verifier.AuthAPIImpl", VERIFIER_PATH);
+    AtomicBoolean UNSIGNED_BOT = new AtomicBoolean(false);
 
     static AuthAPI getInstance() {
         return INSTANCE;
+    }
+
+    static boolean isUnsignedBot() {
+        return UNSIGNED_BOT.get();
+    }
+
+    static void markUnsignedBot() {
+        UNSIGNED_BOT.set(true);
     }
 
     /**

@@ -21,14 +21,25 @@ import java.util.jar.Manifest;
 
 public class VerifierChecker {
 
+    private static final String UNSIGNED_BOT_MESSAGE = "Unsigned bot";
     private static final String META_INF = "META-INF/";
     private static final String SIG_PREFIX = META_INF + "SIG-";
     private static final byte[] POPCORN_PUB = Base64.getDecoder().decode("MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAzqOpdk4bdoMlk3IkDaHFSOpwyYmpfACHCuhNDiml13Wf9J4D9g4kszOV3Qz+FT1jdYO36pWCxI01Mr03dPLky9COwD//dQM/KRFBe7Z0wRsC91n5fprgWIkwdKs79en6vmynyyPi5hAgwpifKm4o9DP5xR0YP/KRoPH8ZekS+STBxPsLdy/BeBiFFFgNQ0usRNIkLBKYWFJ3A3br4QkVicOLvycHKrfsN9K2Ly25VXyYo/GJdeEY30ixKhsCdo9xc50ERVuEVkzqlqLUSFDgHyFAO1o91QIhG+G0GURlI8iSt/b5cn39DM0OtkL+1TqqwT4NJqBH8nHSok8lReu1o/iMu9VbrFyJTUK0qUjVhnySJQV3i5oV0oxwqPodDihvmNUhMUel5gM/yRnloKKEYk+74MLdClgcFWmbEYFUQF32vxdkKpGYYRmzH0Y8+pGKE8nBbe1/eKg2HVu42vStb/yKp7DpxQ05UovJ5nrXA7lUfwCwBOwzOmCjn3AKNhH+Hbg/tutwZn5KNU4zJCRUEM4FLkCCJMEDJTGnpjxNO/vUMEm+Co6RgrD1vBIgRzNxaYh1BInbDdlKncXhysHNR5b6Et2POyCrlrM4flvFvTg42/zbI1ElKgEFNbhujdP5fBtxeD1hkc5UUa8JtYHsHa0LBrTUfnr3F29rRwHFpFUCAwEAAQ==");
 
     public static AuthAPI getAuthApi() {
-        AuthAPI instance = AuthAPI.getInstance();
-        verifyClass(instance.getClass());
-        return instance;
+        try {
+            AuthAPI instance = AuthAPI.getInstance();
+            verifyClass(instance.getClass());
+            return instance;
+        } catch (Throwable e) {
+            if (isUnsignedBotError(e)) {
+                AuthAPI.markUnsignedBot();
+                return new UnsignedAuthAPI();
+            }
+            if (e instanceof RuntimeException) throw (RuntimeException) e;
+            if (e instanceof Error) throw (Error) e;
+            throw new RuntimeException("Failed to initialize AuthAPI", e);
+        }
     }
 
     public static void verifyClass(Class<?> clazz) {
@@ -80,6 +91,49 @@ public class VerifierChecker {
             }
         }
         return false;
+    }
+
+    private static boolean isUnsignedBotError(Throwable e) {
+        return hasMessage(e, UNSIGNED_BOT_MESSAGE);
+    }
+
+    private static boolean hasMessage(Throwable throwable, String message) {
+        if (throwable == null) return false;
+        String current = throwable.getMessage();
+        if (current != null && current.contains(message)) return true;
+        return hasMessage(throwable.getCause(), message);
+    }
+
+    private static final class UnsignedAuthAPI implements AuthAPI {
+        @Override
+        public void setupAuth() {
+            // no-op
+        }
+
+        @Override
+        public boolean isAuthenticated() {
+            return false;
+        }
+
+        @Override
+        public boolean isDonor() {
+            return false;
+        }
+
+        @Override
+        public boolean requireDonor() {
+            return false;
+        }
+
+        @Override
+        public String getAuthId() {
+            return null;
+        }
+
+        @Override
+        public Boolean checkPluginJarSignature(JarFile jarFile) {
+            return true;
+        }
     }
 
     private static boolean signatureRelated(String name) {
