@@ -18,6 +18,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 public class ItemInfo extends Item {
+    private static final String ITEM_IMAGE_BASE_URL = "https://www.darkorbit.com/do_img/global/items/";
+
     private String name;
     private String localizationId;
     @SerializedName("C") private String category;
@@ -45,7 +47,7 @@ public class ItemInfo extends Item {
 
     public BufferedImage getBufferedImage(IconType type) {
         try {
-            return ImageIO.read(new URL("http://www.darkorbit.com/do_img/global/items/"
+            return ImageIO.read(new URL(ITEM_IMAGE_BASE_URL
                     + getLocalizationId().replace("_", "/") + "_" + type.urlName + ".png"));
         } catch (IOException e) {
             e.printStackTrace();
