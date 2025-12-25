@@ -35,6 +35,7 @@ import java.util.zip.ZipEntry;
 
 public class PluginHandler implements API.Singleton {
     private static final Gson GSON = new Gson();
+    private static final String UNSIGNED_BOT_MESSAGE = "Unsigned bot";
 
     public static final PluginIssue LOADED_TWICE = new PluginIssue("plugins.issues.loaded_twice",
             I18n.get("plugins.issues.loaded_twice.desc"), PluginIssue.Level.ERROR);
