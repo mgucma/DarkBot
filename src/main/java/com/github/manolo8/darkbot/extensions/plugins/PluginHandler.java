@@ -35,6 +35,7 @@ import java.util.zip.ZipEntry;
 
 public class PluginHandler implements API.Singleton {
     private static final Gson GSON = new Gson();
+    private static final String UNSIGNED_BOT_MESSAGE = "Unsigned bot";
 
     public static final PluginIssue LOADED_TWICE = new PluginIssue("plugins.issues.loaded_twice",
             I18n.get("plugins.issues.loaded_twice.desc"), PluginIssue.Level.ERROR);
@@ -67,6 +68,7 @@ public class PluginHandler implements API.Singleton {
     private static final List<PluginListener> LISTENERS = new ArrayList<>();
 
     private final EventBrokerAPI eventBroker;
+    private volatile boolean signatureChecksDisabled;
 
     public void addListener(PluginListener listener) {
         if (!LISTENERS.contains(listener)) LISTENERS.add(listener);
@@ -268,13 +270,50 @@ public class PluginHandler implements API.Singleton {
     }
 
     private void testSignature(Plugin plugin, JarFile jar) throws IOException {
+        if (signatureChecksDisabled) return;
         try {
-            Boolean signatureValid = AuthAPI.getInstance().checkPluginJarSignature(jar);
+            AuthAPI authAPI = getAuthAPI();
+            if (authAPI == null) return;
+            Boolean signatureValid = authAPI.checkPluginJarSignature(jar);
             if (signatureValid == null) plugin.getIssues().add(PLUGIN_NOT_SIGNED);
             else if (!signatureValid) plugin.getIssues().add(UNKNOWN_SIGNATURE);
-        } catch (SecurityException e) {
-            plugin.getIssues().add(INVALID_SIGNATURE);
+        } catch (Throwable e) {
+            if (isUnsignedBotError(e)) {
+                signatureChecksDisabled = true;
+                return;
+            }
+            if (e instanceof SecurityException) {
+                plugin.getIssues().add(INVALID_SIGNATURE);
+                return;
+            }
+            if (e instanceof IOException) throw (IOException) e;
+            throw new RuntimeException("Failed to check plugin signature", e);
         }
+    }
+
+    private AuthAPI getAuthAPI() {
+        try {
+            return AuthAPI.getInstance();
+        } catch (Throwable e) {
+            if (isUnsignedBotError(e)) {
+                signatureChecksDisabled = true;
+                return null;
+            }
+            if (e instanceof RuntimeException) throw (RuntimeException) e;
+            if (e instanceof Error) throw (Error) e;
+            throw new RuntimeException("Failed to initialize AuthAPI", e);
+        }
+    }
+
+    private boolean isUnsignedBotError(Throwable e) {
+        return hasMessage(e, UNSIGNED_BOT_MESSAGE);
+    }
+
+    private boolean hasMessage(Throwable throwable, String message) {
+        if (throwable == null) return false;
+        String current = throwable.getMessage();
+        if (current != null && current.contains(message)) return true;
+        return hasMessage(throwable.getCause(), message);
     }
 
     private boolean isFeature(String path) {
