@@ -271,7 +271,9 @@ public class PluginHandler implements API.Singleton {
     private void testSignature(Plugin plugin, JarFile jar) throws IOException {
         if (signatureChecksDisabled) return;
         try {
-            Boolean signatureValid = AuthAPI.getInstance().checkPluginJarSignature(jar);
+            AuthAPI authAPI = getAuthAPI();
+            if (authAPI == null) return;
+            Boolean signatureValid = authAPI.checkPluginJarSignature(jar);
             if (signatureValid == null) plugin.getIssues().add(PLUGIN_NOT_SIGNED);
             else if (!signatureValid) plugin.getIssues().add(UNKNOWN_SIGNATURE);
 
@@ -283,6 +285,31 @@ public class PluginHandler implements API.Singleton {
         String current = throwable.getMessage();
         if (current != null && current.contains(message)) return true;
         return hasMessage(throwable.getCause(), message);
+    }
+
+    private boolean isUnsignedBotError(Throwable e) {
+        return hasMessage(e, "Unsigned bot");
+    }
+
+    private boolean hasMessage(Throwable throwable, String message) {
+        if (throwable == null) return false;
+        String current = throwable.getMessage();
+        if (current != null && current.contains(message)) return true;
+        return hasMessage(throwable.getCause(), message);
+    }
+
+    private AuthAPI getAuthAPI() {
+        try {
+            return AuthAPI.getInstance();
+        } catch (Throwable e) {
+            if (isUnsignedBotError(e)) {
+                signatureChecksDisabled = true;
+                return null;
+            }
+            if (e instanceof RuntimeException) throw (RuntimeException) e;
+            if (e instanceof Error) throw (Error) e;
+            throw new RuntimeException("Failed to initialize AuthAPI", e);
+        }
     }
 
     private boolean isUnsignedBotError(Throwable e) {
